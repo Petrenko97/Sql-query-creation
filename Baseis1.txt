@@ -1,0 +1,234 @@
+--Q3
+
+select fname
+from employee
+where salary > (select avg(salary)+5000
+			   from employee
+				inner join department on department.dnumber=employee.dno )
+--Q2
+
+select  fname
+from employee as S
+where dno in (select dno
+			   from employee  as T
+			  group by dno 
+			    having min(salary)=25000   ) ;
+				
+--Q1				
+				
+select dname,count(*)
+from department 
+inner join employee on department.dnumber=employee.dno 
+group by dname 
+having max(salary)>42000  ;	
+
+
+--Q4 όνομα τμήματος, το όνομα διευθυντή και τον μισθό διευθυντή για κάθε τμήμα.
+
+drop view manager_details;
+
+create view manager_details as 
+select dname,fname,salary
+from department inner join employee on department.mgrssn=employee.ssn ;
+
+
+SELECT * FROM manager_details;			
+
+--Q5
+
+--όνομα του τμήματος,
+--το ονοματεπώνυμο του διευθυντή 
+--τον αριθμό των εργαζομένων που δουλεύουν σε αυτό το τμήμα 
+--τον αριθμό των έργων που ελέγχονται από το τμήμα αυτό
+
+
+drop view dpt_totals;
+
+create view dpt_totals as 
+
+
+with manag_info(dname,fname,lname) as
+
+(select dname,fname,lname
+from department inner join employee on department.mgrssn=employee.ssn ) ,
+
+numEmployee(dname,total_empl) as
+
+(select dname,count(*)
+from department inner join employee on department.dnumber=employee.dno
+group by dname) ,
+
+num_proj(dname,total_proj) as 
+
+(select dname,count(*)
+from department 
+inner join project on department.dnumber=project.dnum 
+group by dname )
+
+select manag_info.dname,fname,lname,total_empl,total_proj
+from manag_info inner join numEmployee on manag_info.dname=numEmployee.dname  
+inner join num_proj on numEmployee.dname=num_proj.dname ;
+
+
+
+
+SELECT * FROM dpt_totals;
+
+
+--Q6
+
+--όνομα έργου, 
+--όνομα του τμήματος που ελέγχει το έργο,
+--πλήθος εργαζομένων,
+--πλήθος αντρών εργαζομένων,
+--πλήθος γυναικών εργαζομένων,
+--και συνολικό αριθμό ωρών απασχόλησης ανά εβδομάδα στο έργο αυτό για κάθε έργο.
+
+drop view Project_information;
+
+create view Project_information as 
+
+with proj_dept(pname,dname) as
+
+	(select pname,dname 
+	from department inner join project  on project.dnum=department.dnumber),
+
+proj_stats as 
+	
+	(select  pname,count (employee.ssn) as employee_num,
+		count ( case when sex='M' then 1 end) as male_num,
+		count ( case when sex='F' then 1 end) as female_num,
+		sum(hours)/7 as total_hours
+  
+	from project inner join works_on  on project.pnumber=works_on.pno inner join employee on works_on.essn=employee.ssn 
+
+	group by pname 
+	)
+
+	select proj_dept.pname,proj_dept.dname,employee_num,male_num,female_num,total_hours
+	from proj_dept inner join proj_stats on proj_dept.pname=proj_stats.pname  ;
+
+
+
+SELECT * FROM Project_information;
+
+
+--Q7
+
+
+--ονόματα των τριών εργαζομένων που έχουν δουλέψει τις περισσότερες ώρες στα έργα της εταιρίας
+--τα ονόματα των τμημάτων που ανήκουν
+--καθώς και να επιμεριστούν οι ώρες τους στα έργα στα οποία δούλεψαν.
+
+with most_work(essn,total_hours) as 
+
+	(select essn,sum(hours) as total_hours
+  
+	from project inner join works_on  on project.pnumber=works_on.pno inner join employee on works_on.essn=employee.ssn 
+	group by essn
+    order by total_hours desc limit 3 offset 1) ,
+	
+	dept_names(w_names,dnames,dssn) as 
+	(	select fname,dname,ssn  
+	from department inner join employee on employee.dno=department.dnumber)
+	
+	
+select w_names,dnames,most_work.essn,pname,hours
+from  dept_names inner join most_work on most_work.essn=dept_names.dssn  inner join works_on on most_work.essn=works_on.essn
+inner join project on project.pnumber=works_on.pno
+
+--Q8
+
+select 
+    name,
+ count(	case when  takes.grade  like 	'A%'  then 1 end) as sum_A,
+  count(case when  takes.grade   like 	'B%'  then 1 end) as sum_B,
+ count(	case when  takes.grade  like 		'C%'  then 1 end)   as sum_C,
+  count(		case when   takes.grade    like 	'D%'  then 1 end)  as sum_D,
+ count(	case when  takes.grade   like 	'E%'  then 1 end) as sum_E,
+ count(  case when  takes. grade  like	 'F%'   then 1 end)as sum_F
+
+from instructor 
+inner join teaches on instructor.id = teaches.id
+inner join section  on teaches.course_id = section.course_id and teaches.sec_id=section.sec_id and section.semester=teaches.semester
+inner join takes on takes.course_id=section.course_id and takes.sec_id=section.sec_id and section.semester=takes.semester
+
+
+group by instructor.name
+order by sum_A,sum_B,sum_C,sum_D,sum_F 
+
+--Q9
+
+
+-- κτήρια,
+--τις αίθουσες διδασκαλίας (για κάθε κτήριο)
+--τον συνολικό αριθμό φοιτητών
+--τις συνολικές ώρες διδασκαλίας ανά εξάμηνο.
+
+drop view Sem;
+
+create view Sem as 
+
+with total_count(semester,total_students) as
+(select semester,count(id) as total_students 
+ from takes
+group by semester),
+
+total_hours(sem,rm,t_hr) as
+(select semester,room_number, sum(end_min-start_min)  from 
+section natural join time_slot
+group by semester,room_number
+)
+
+select total_count.semester,building,rm as room_number,total_students,t_hr as total_minuites from student 
+natural join department
+inner join takes on student.id=takes.id
+natural join section
+
+inner join total_hours on rm=section.room_number and sem=section.semester 
+inner join total_count on total_count.semester=section.semester
+
+;
+
+select * from Sem
+
+--Q10
+
+drop view Program_information;
+
+create view Program_information as 
+
+select department.dept_name,teaches.year, teaches.semester,day,course.title,
+ room_number,start_hr,instructor.name
+from department
+inner join instructor on department.dept_name = instructor.dept_name 
+inner join teaches on instructor.id = teaches.id
+inner join section on teaches.course_id = section.course_id and teaches.sec_id=section.sec_id and section.semester=teaches.semester and teaches.year=section.year
+inner join time_slot on section.time_slot_id = time_slot.time_slot_id
+inner join course on course.course_id=section.course_id
+order by department.dept_name,year,CASE teaches.semester
+      WHEN 'Fall' THEN 1
+      WHEN 'Winter' THEN 2
+      WHEN 'Spring' THEN 3
+      WHEN 'Summer' THEN 4
+      ELSE 5
+    END,
+    CASE day
+      WHEN 'M' THEN 1
+      WHEN 'T' THEN 2
+      WHEN 'W' THEN 3
+      WHEN 'R' THEN 4
+	  WHEN 'F' THEN 5
+      ELSE 6 
+   END, start_hr asc
+;
+
+select* from program_information
+
+
+
+
+
+
+
+
